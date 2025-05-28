@@ -10,14 +10,7 @@ export function Hero() {
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
       {/* Mystical decorative elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-10 left-10 text-6xl opacity-20 animate-float text-purple-300">🌟</div>
-        <div className="absolute top-20 right-20 text-4xl opacity-20 animate-pulse-mystical text-pink-300">✨</div>
-        <div className="absolute bottom-20 left-20 text-5xl opacity-20 animate-float text-blue-300" style={{ animationDelay: '2s' }}>🔮</div>
-        <div className="absolute bottom-10 right-10 text-3xl opacity-20 animate-pulse-mystical text-indigo-300" style={{ animationDelay: '1s' }}>🌙</div>
-        <div className="absolute top-1/2 left-1/4 text-2xl opacity-10 animate-glow text-purple-400">💫</div>
-        <div className="absolute top-1/3 right-1/3 text-2xl opacity-10 animate-glow text-pink-400" style={{ animationDelay: '3s' }}>⭐</div>
-      </div>
+
 
       <div className="relative z-10 max-w-4xl mx-auto px-6 text-center">
         <div className="mb-8">

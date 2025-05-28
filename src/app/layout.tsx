@@ -42,6 +42,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.variable} ${playfair.variable} font-sans antialiased`}>
+        <div className="grateful-bg-left"></div>
+        <div className="grateful-bg-right"></div>
         <Providers>
           <Navigation />
           <main className="min-h-screen">
