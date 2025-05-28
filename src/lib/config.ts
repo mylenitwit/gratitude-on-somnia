@@ -125,7 +125,7 @@ export const CONTRACT_ABI = [
 
 // Contract Configuration - DEPLOYED ON SOMNIA!
 export const CONTRACT_CONFIG = {
-  address: '0x273bf32871cb9190903c016e7c1b19c3b5dcde89' as `0x${string}`,
+  address: '0xf2939b8707c74e38ff682143432a3bf6b4e76abd' as `0x${string}`,
   abi: CONTRACT_ABI,
 }
 
