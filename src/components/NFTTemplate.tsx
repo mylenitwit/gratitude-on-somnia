@@ -16,12 +16,7 @@ export function NFTTemplate({ message, number, className = "" }: NFTTemplateProp
       <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-black/10" />
       
       {/* Mystical decorations */}
-      <div className="absolute inset-0 opacity-20">
-        <div className="absolute top-[10%] left-[10%] text-4xl animate-pulse-mystical">🌟</div>
-        <div className="absolute top-[20%] right-[15%] text-2xl animate-pulse-mystical delay-1000">✨</div>
-        <div className="absolute bottom-[15%] left-[20%] text-3xl animate-pulse-mystical delay-2000">🔮</div>
-        <div className="absolute bottom-[25%] right-[10%] text-xl animate-pulse-mystical delay-3000">🌙</div>
-      </div>
+
 
       {/* Floating particles */}
       <div className="absolute inset-0">

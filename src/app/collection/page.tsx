@@ -115,15 +115,7 @@ function NFTDetailModal({ isOpen, onClose, tokenId, gratitudeData }: NFTDetailMo
                 >
                   View on Explorer
                 </a>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(window.location.href)
-                    alert('Link copied to clipboard!')
-                  }}
-                  className="flex-1 glass-card text-purple-200 py-2 px-3 rounded-lg hover:bg-purple-500/20 transition-colors border border-purple-500/30 text-sm"
-                >
-                  Share Energy
-                </button>
+
               </div>
             </div>
           </div>

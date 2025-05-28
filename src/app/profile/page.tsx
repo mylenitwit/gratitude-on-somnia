@@ -201,12 +201,7 @@ export default function ProfilePage() {
     return (
       <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
         {/* Mystical background elements */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute top-10 left-10 text-6xl opacity-20 animate-float text-purple-300">🌟</div>
-          <div className="absolute top-20 right-20 text-4xl opacity-20 animate-pulse-mystical text-pink-300">✨</div>
-          <div className="absolute bottom-20 left-20 text-5xl opacity-20 animate-float text-blue-300" style={{ animationDelay: '2s' }}>🔮</div>
-          <div className="absolute bottom-10 right-10 text-3xl opacity-20 animate-pulse-mystical text-indigo-300" style={{ animationDelay: '1s' }}>🌙</div>
-        </div>
+
 
         <div className="text-center relative z-10">
           <div className="glass-mystical rounded-2xl p-8 max-w-md mx-auto border border-purple-500/30">
