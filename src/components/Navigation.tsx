@@ -30,9 +30,7 @@ export function Navigation() {
         <div className="flex items-center justify-between h-16">
           {/* Mystical Logo */}
           <Link href="/" className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center animate-glow">
-              <span className="text-white font-bold text-sm">🙏</span>
-            </div>
+
             <span className="font-bold text-xl text-cosmic hidden sm:block font-serif">
               {APP_CONFIG.name}
             </span>
