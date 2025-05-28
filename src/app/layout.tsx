@@ -20,6 +20,12 @@ export const metadata: Metadata = {
   description: APP_CONFIG.description,
   keywords: ["gratitude", "nft", "blockchain", "somnia", "mindfulness", "daily gratitude"],
   authors: [{ name: "Gratitude on Somnia Team" }],
+  icons: {
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' }
+    ],
+    apple: '/apple-icon.svg',
+  },
   openGraph: {
     title: APP_CONFIG.name,
     description: APP_CONFIG.description,
