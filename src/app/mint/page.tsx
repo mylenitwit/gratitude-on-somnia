@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi'
+import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract, useChainId, useSwitchChain } from 'wagmi'
 import { parseEther } from 'viem'
-import { CONTRACT_CONFIG, APP_CONFIG } from '@/lib/config'
+import { CONTRACT_CONFIG, APP_CONFIG, somniaNetwork } from '@/lib/config'
 import { ConnectButton } from '@/components/ConnectButton'
 import { generateGratitudeMetadata, uploadToIPFS, createMetadataURI } from '@/lib/metadata'
 
@@ -14,8 +14,11 @@ export default function MintPage() {
   const [storageError, setStorageError] = useState<string | null>(null)
   const [showFullScreenLoading, setShowFullScreenLoading] = useState(false)
   const [videoError, setVideoError] = useState(false)
+  const [isSwitchingNetwork, setIsSwitchingNetwork] = useState(false)
   
   const { address, isConnected } = useAccount()
+  const chainId = useChainId()
+  const { switchChain } = useSwitchChain()
   const { writeContract, data: hash, error, isPending } = useWriteContract()
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
@@ -29,14 +32,120 @@ export default function MintPage() {
 
   const nextGratitudeNumber = totalSupply ? Number(totalSupply) + 1 : 1
 
-  // Check template availability on mount
+  // Check if user is on correct network
+  const isCorrectNetwork = chainId === somniaNetwork.id
+  const needsNetworkSwitch = isConnected && !isCorrectNetwork
+
+  // Debug logs - gerçek ağ bilgisini de kontrol et
   useEffect(() => {
-    // Template availability check removed - not needed and causes CORS issues
-    // Template is hosted externally and works fine
-  }, [])
+    const checkRealNetwork = async () => {
+      if (typeof window !== 'undefined' && window.ethereum) {
+        try {
+          const realChainId = await window.ethereum.request({ method: 'eth_chainId' })
+          const realChainIdDecimal = parseInt(realChainId, 16)
+
+        } catch (err) {
+          console.error('Failed to get real chain ID:', err)
+        }
+      }
+    }
+    
+    checkRealNetwork()
+  }, [chainId, isCorrectNetwork, needsNetworkSwitch])
+
+  // Auto-switch to Somnia when wallet connects
+  useEffect(() => {
+    const autoSwitchNetwork = async () => {
+      if (isConnected && !isCorrectNetwork && !isSwitchingNetwork && switchChain) {
+
+        try {
+          setIsSwitchingNetwork(true)
+          await switchChain({ chainId: somniaNetwork.id })
+
+        } catch (err) {
+          console.error('Auto network switch failed:', err)
+        } finally {
+          setIsSwitchingNetwork(false)
+        }
+      }
+    }
+
+    autoSwitchNetwork()
+  }, [isConnected, isCorrectNetwork, isSwitchingNetwork, switchChain])
+
+  // Handle network switch
+  const handleSwitchNetwork = async () => {
+    if (!switchChain) return
+    
+    try {
+      setIsSwitchingNetwork(true)
+      await switchChain({ chainId: somniaNetwork.id })
+    } catch (err) {
+      console.error('Network switch failed:', err)
+    } finally {
+      setIsSwitchingNetwork(false)
+    }
+  }
 
   const handleMintClick = async () => {
     if (!message.trim() || !isConnected || !address) return
+
+    // Gerçek ağ bilgisini al
+    let realChainId = chainId
+    if (typeof window !== 'undefined' && window.ethereum) {
+      try {
+        const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' })
+        realChainId = parseInt(chainIdHex, 16)
+      } catch (err) {
+        console.error('Failed to get real chain ID:', err)
+      }
+    }
+
+    // Eğer yanlış ağdaysa, MUTLAKA ağ değiştir
+    if (realChainId !== somniaNetwork.id) {
+      try {
+        setIsSwitchingNetwork(true)
+        
+        // Önce ağı ekle (eğer yoksa)
+        try {
+          await window.ethereum.request({
+            method: 'wallet_addEthereumChain',
+            params: [{
+              chainId: `0x${somniaNetwork.id.toString(16)}`,
+              chainName: somniaNetwork.name,
+              nativeCurrency: somniaNetwork.nativeCurrency,
+              rpcUrls: somniaNetwork.rpcUrls.default.http,
+              blockExplorerUrls: [somniaNetwork.blockExplorers.default.url],
+            }],
+          })
+        } catch (addError) {
+        }
+
+        // Sonra ağa geç
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: `0x${somniaNetwork.id.toString(16)}` }],
+        })
+        
+        // Ağ değiştikten sonra kısa bir bekleme
+        await new Promise(resolve => setTimeout(resolve, 2000))
+        
+        // Tekrar kontrol et
+        const newChainIdHex = await window.ethereum.request({ method: 'eth_chainId' })
+        const newChainId = parseInt(newChainIdHex, 16)
+        
+        if (newChainId !== somniaNetwork.id) {
+          throw new Error(`Network switch failed. Current: ${newChainId}, Required: ${somniaNetwork.id}`)
+        }
+        
+      } catch (err) {
+        console.error('Network switch failed:', err)
+        setIsSwitchingNetwork(false)
+        alert(`Please manually switch to Somnia Network in your wallet.\nCurrent network: ${realChainId}\nRequired network: ${somniaNetwork.id}`)
+        return
+      }
+      setIsSwitchingNetwork(false)
+    }
 
     try {
       setIsLoading(true)
@@ -57,7 +166,6 @@ export default function MintPage() {
       try {
         const metadataId = await uploadToIPFS(metadata) // Function name kept for compatibility
         metadataURI = createMetadataURI(metadataId)
-        console.log('Metadata uploaded:', metadataURI)
       } catch (storageErr) {
         console.error('Storage upload failed:', storageErr)
         setStorageError('Metadata upload failed. Using fallback storage.')
@@ -66,6 +174,14 @@ export default function MintPage() {
       }
       
       setIsUploadingMetadata(false)
+      
+      // Son bir kez ağ kontrolü yap
+      const finalChainIdHex = await window.ethereum.request({ method: 'eth_chainId' })
+      const finalChainId = parseInt(finalChainIdHex, 16)
+      
+      if (finalChainId !== somniaNetwork.id) {
+        throw new Error(`Network changed during mint process. Current: ${finalChainId}, Required: ${somniaNetwork.id}`)
+      }
       
       // Mint NFT with metadata URI
       writeContract({
@@ -101,6 +217,7 @@ export default function MintPage() {
 
   const isFormValid = message.trim().length > 0 && message.length <= APP_CONFIG.maxMessageLength
   const isMinting = isLoading || isPending || isConfirming || isUploadingMetadata
+  const canMint = isFormValid && isCorrectNetwork && !isMinting && !isSwitchingNetwork
 
   // Full screen loading view
   if (showFullScreenLoading) {
@@ -240,6 +357,43 @@ export default function MintPage() {
           </div>
         )}
 
+        {/* Network Warning */}
+        {needsNetworkSwitch && (
+          <div className="max-w-4xl mx-auto mb-4">
+            <div className="glass-card border border-orange-500/30 rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-orange-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm text-orange-300 font-medium">Wrong Network Detected</p>
+                    <p className="text-xs text-orange-200 mt-1">
+                      You need to switch to Somnia Network to manifest your gratitude
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleSwitchNetwork}
+                  disabled={isSwitchingNetwork}
+                  className="btn-mystical text-white text-sm px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSwitchingNetwork ? (
+                    <div className="flex items-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Switching...
+                    </div>
+                  ) : (
+                    'Switch to Somnia'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="grid lg:grid-cols-2 gap-6 max-w-5xl mx-auto">
           {/* Left Side - Mystical Form */}
           <div className="glass-mystical rounded-xl p-6">
@@ -293,10 +447,21 @@ export default function MintPage() {
                 {/* Mint Button */}
                 <button
                   onClick={handleMintClick}
-                  disabled={!isFormValid || isMinting}
+                  disabled={(!isFormValid && isCorrectNetwork) || isMinting || isSwitchingNetwork}
                   className="w-full btn-mystical text-white font-semibold py-3 px-5 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                 >
-                  ✨ Manifest Gratitude ✨
+                  {needsNetworkSwitch ? (
+                    isSwitchingNetwork ? (
+                      <div className="flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
+                        Switching to Somnia...
+                      </div>
+                    ) : (
+                      `🔗 Switch to Somnia (Current: ${chainId})`
+                    )
+                  ) : (
+                    '✨ Manifest Gratitude ✨'
+                  )}
                 </button>
 
                 {/* Error Display */}
