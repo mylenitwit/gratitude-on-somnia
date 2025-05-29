@@ -15,6 +15,7 @@ export default function MintPage() {
   const [showFullScreenLoading, setShowFullScreenLoading] = useState(false)
   const [videoError, setVideoError] = useState(false)
   const [isSwitchingNetwork, setIsSwitchingNetwork] = useState(false)
+  const [emergencyGasMode, setEmergencyGasMode] = useState(false)
   
   const { address, isConnected } = useAccount()
   const chainId = useChainId()
@@ -187,37 +188,55 @@ export default function MintPage() {
       }
       
       // Gas estimation with safety buffer
-      let gasLimit = BigInt(25000000) // Default fallback
-      try {
-        const estimatedGas = await window.ethereum.request({
-          method: 'eth_estimateGas',
-          params: [{
-            to: CONTRACT_CONFIG.address,
-            from: address,
-            data: '0x', // Contract call data would be here
-            value: `0x${parseEther(APP_CONFIG.mintPrice).toString(16)}`
-          }]
-        })
-        const estimated = BigInt(estimatedGas)
-        gasLimit = estimated + (estimated * BigInt(50)) / BigInt(100) // Add 50% buffer
-        
-        // Minimum gas limit check
-        if (gasLimit < BigInt(20000000)) {
-          gasLimit = BigInt(25000000)
+      let gasLimit = BigInt(50000000) // Increased to 50M default fallback
+      
+      // Emergency mode: çok yüksek gas limit
+      if (emergencyGasMode) {
+        gasLimit = BigInt(100000000) // 100M gas for emergency mode
+        console.log('Emergency gas mode activated: 100M gas limit')
+      } else {
+        try {
+          const estimatedGas = await window.ethereum.request({
+            method: 'eth_estimateGas',
+            params: [{
+              to: CONTRACT_CONFIG.address,
+              from: address,
+              data: '0x', // Contract call data would be here
+              value: `0x${parseEther(APP_CONFIG.mintPrice).toString(16)}`
+            }]
+          })
+          const estimated = BigInt(estimatedGas)
+          gasLimit = estimated + (estimated * BigInt(100)) / BigInt(100) // Add 100% buffer now
+          
+          // Minimum gas limit check - increased
+          if (gasLimit < BigInt(30000000)) {
+            gasLimit = BigInt(50000000)
+          }
+          
+          console.log(`Estimated gas: ${estimated}, Using gas limit: ${gasLimit}`)
+        } catch (gasEstimationError) {
+          console.log('Gas estimation failed, using default limit:', gasEstimationError)
         }
-        
-        console.log(`Estimated gas: ${estimated}, Using gas limit: ${gasLimit}`)
-      } catch (gasEstimationError) {
-        console.log('Gas estimation failed, using default limit:', gasEstimationError)
       }
       
-      // Mint NFT with metadata URI
+      // Mint NFT with metadata URI and enhanced gas parameters
+      console.log('Attempting mint with params:', {
+        gasLimit: gasLimit.toString(),
+        mintPrice: APP_CONFIG.mintPrice,
+        messageLength: message.trim().length,
+        address,
+        networkId: finalChainId
+      })
+      
       writeContract({
         ...CONTRACT_CONFIG,
         functionName: 'mintGratitude',
         args: [message.trim(), metadataURI],
         value: parseEther(APP_CONFIG.mintPrice),
         gas: gasLimit,
+        gasPrice: BigInt(20000000000), // 20 gwei - Somnia için optimize
+        // maxFeePerGas: BigInt(30000000000), // 30 gwei max
+        // maxPriorityFeePerGas: BigInt(2000000000), // 2 gwei tip
       })
       
     } catch (err) {
@@ -472,6 +491,33 @@ export default function MintPage() {
                   </p>
                 </div>
 
+                {/* Emergency Gas Mode Toggle */}
+                {error && error.message.toLowerCase().includes('gas') && (
+                  <div className="glass-card border border-orange-500/30 rounded-lg p-3 mt-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-orange-300 text-xs font-medium">Gas Issues Detected</p>
+                        <p className="text-orange-200 text-xs mt-1">Try emergency gas mode (higher cost)</p>
+                      </div>
+                      <button
+                        onClick={() => setEmergencyGasMode(!emergencyGasMode)}
+                        className={`text-xs px-3 py-1 rounded ${
+                          emergencyGasMode 
+                            ? 'bg-orange-500 text-white' 
+                            : 'glass-card text-orange-300 hover:bg-orange-500/20'
+                        } transition-colors`}
+                      >
+                        {emergencyGasMode ? '✓ Emergency Mode' : 'Enable Emergency'}
+                      </button>
+                    </div>
+                    {emergencyGasMode && (
+                      <p className="text-orange-200 text-xs mt-2">
+                        🚨 Using 100M gas limit - higher transaction cost
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {/* Mint Button */}
                 <button
                   onClick={handleMintClick}
@@ -495,7 +541,7 @@ export default function MintPage() {
                 {/* Error Display */}
                 {error && (
                   <div className="glass-card border border-red-500/30 rounded-lg p-3">
-                    <p className="text-red-300 text-xs">
+                    <p className="text-red-300 text-xs mb-2">
                       {(() => {
                         const errorMessage = error.message.toLowerCase()
                         
@@ -507,22 +553,34 @@ export default function MintPage() {
                           return 'Insufficient balance'
                         }
                         
+                        if (errorMessage.includes('gas') && errorMessage.includes('exceeds')) {
+                          return 'Gas limit exceeded - network congestion detected'
+                        }
+                        
+                        if (errorMessage.includes('gas')) {
+                          return 'Gas estimation failed - try again'
+                        }
+                        
                         if (errorMessage.includes('network') || errorMessage.includes('connection')) {
                           return 'Network connection error'
                         }
                         
-                        if (errorMessage.includes('gas')) {
-                          return 'Gas fee error'
+                        if (errorMessage.includes('contract')) {
+                          return 'Smart contract error'
                         }
                         
-                        if (errorMessage.includes('contract')) {
-                          return 'Contract error'
+                        if (errorMessage.includes('revert')) {
+                          return 'Transaction reverted - check contract conditions'
                         }
                         
                         // Fallback to original message for unknown errors
-                        return `Error: ${error.message}`
+                        return `Error: ${error.message.slice(0, 100)}...`
                       })()}
                     </p>
+                    <details className="text-xs text-red-400 mt-1">
+                      <summary className="cursor-pointer">Technical Details</summary>
+                      <p className="mt-1 break-words">{error.message}</p>
+                    </details>
                   </div>
                 )}
 
