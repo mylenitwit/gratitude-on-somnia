@@ -42,7 +42,8 @@ export default function MintPage() {
       if (typeof window !== 'undefined' && window.ethereum) {
         try {
           const realChainId = await window.ethereum.request({ method: 'eth_chainId' })
-          const realChainIdDecimal = parseInt(realChainId, 16)
+          // Kullanımda olmadığı için comment olarak bırakıyorum
+          // const realChainIdDecimal = parseInt(realChainId, 16)
 
         } catch (err) {
           console.error('Failed to get real chain ID:', err)
@@ -119,6 +120,8 @@ export default function MintPage() {
             }],
           })
         } catch (addError) {
+          // Network zaten ekli olabilir, devam et
+          console.log('Network add attempt:', addError)
         }
 
         // Sonra ağa geç
@@ -183,12 +186,38 @@ export default function MintPage() {
         throw new Error(`Network changed during mint process. Current: ${finalChainId}, Required: ${somniaNetwork.id}`)
       }
       
+      // Gas estimation with safety buffer
+      let gasLimit = BigInt(25000000) // Default fallback
+      try {
+        const estimatedGas = await window.ethereum.request({
+          method: 'eth_estimateGas',
+          params: [{
+            to: CONTRACT_CONFIG.address,
+            from: address,
+            data: '0x', // Contract call data would be here
+            value: `0x${parseEther(APP_CONFIG.mintPrice).toString(16)}`
+          }]
+        })
+        const estimated = BigInt(estimatedGas)
+        gasLimit = estimated + (estimated * BigInt(50)) / BigInt(100) // Add 50% buffer
+        
+        // Minimum gas limit check
+        if (gasLimit < BigInt(20000000)) {
+          gasLimit = BigInt(25000000)
+        }
+        
+        console.log(`Estimated gas: ${estimated}, Using gas limit: ${gasLimit}`)
+      } catch (gasEstimationError) {
+        console.log('Gas estimation failed, using default limit:', gasEstimationError)
+      }
+      
       // Mint NFT with metadata URI
       writeContract({
         ...CONTRACT_CONFIG,
         functionName: 'mintGratitude',
         args: [message.trim(), metadataURI],
         value: parseEther(APP_CONFIG.mintPrice),
+        gas: gasLimit,
       })
       
     } catch (err) {
@@ -217,7 +246,6 @@ export default function MintPage() {
 
   const isFormValid = message.trim().length > 0 && message.length <= APP_CONFIG.maxMessageLength
   const isMinting = isLoading || isPending || isConfirming || isUploadingMetadata
-  const canMint = isFormValid && isCorrectNetwork && !isMinting && !isSwitchingNetwork
 
   // Full screen loading view
   if (showFullScreenLoading) {
